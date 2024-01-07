@@ -47,7 +47,7 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 st.title("OCR with Streamlit")
 
 # Create an empty DataFrame to store the extracted data
-excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma"])
+excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly"])
 
 uploaded_file = st.file_uploader("Please upload a photo or a Pdf!", accept_multiple_files=False, type=["jpg", "jpeg", "png", "pdf"])
 
@@ -103,17 +103,52 @@ if uploaded_file:
 
                     st.write(f"Rendszám: {license_plate[0]}")
 
-                # regexes_for_mass_start = ['netté témeg:', 'nettéd témeg']
-                # regexes_for_mass_end = ['megjegyzés']
+                regexes_for_mass_start = ['nettó tömeg:']
+                # regexes_for_mass_end = ['kg']
+
+                mass_start = find_regex_with_fuzzy(regexes_for_mass_start, lower_case_text, max_l_dist=2)
+                start_index = mass_start[0].end
+
+                # Find the index of the first numeric digit after the start index
+                first_digit_index = -1
+                for i in range(start_index, len(lower_case_text)):
+                    if lower_case_text[i].isdigit():
+                        first_digit_index = i
+                        break
+
+                # Initialize an empty string to store the consecutive numbers
+                consecutive_numbers = ""
+
+                # Iterate through characters starting from the first numeric digit found
+                for char in lower_case_text[first_digit_index:]:
+                    # Check if the character is a numeric digit
+                    if char.isdigit():
+                        consecutive_numbers += char
+                    else:
+                        # Break the loop if a non-numeric character is encountered
+                        break
+
+                mass = consecutive_numbers
+
+                # search_for_the_second_regex_window = lower_case_text[start_index:start_index + 20]
+                #
+                # mass_end = find_regex_with_fuzzy(regexes_for_mass_end, search_for_the_second_regex_window, max_l_dist=2)
+                #
+                # end_index = mass_end[0].start
+                #
+                # mass = lower_case_text[start_index + 1:end_index:1]
+                # st.write(start_index, end_index)
 
                 st.write(f"Dátum: {date}")
                 st.write(f"Szállítólevél: {transfer_number}")
+                st.write(f"Nettó tömeg: {mass}")
 
                 # Append the extracted data to the DataFrame
                 excel_data = excel_data.append({
                     "Dátum": date.strip(),
                     "Rendszám": license_plate[0].strip(),
-                    "Szállítólevél száma": transfer_number.strip()
+                    "Szállítólevél száma": transfer_number.strip(),
+                    "Súly": mass
                 }, ignore_index=True)
 
             # Save the DataFrame to an Excel file
