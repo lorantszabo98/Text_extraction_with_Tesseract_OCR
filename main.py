@@ -5,6 +5,9 @@ import fitz
 from fuzzysearch import find_near_matches
 import openpyxl
 import pandas as pd
+import tkinter as tk
+from tkinter import filedialog
+import os
 
 
 def find_regex_with_fuzzy(reference_list, text, max_l_dist=2):
@@ -42,6 +45,37 @@ def extract_data(start_regex, end_regex, text, max_l_dist=2):
     return text[start_index + 1:end_index:1]
 
 
+def read_consecutive_numbers_from_index(text, start_index):
+    # Ensure the start index is within the bounds of the text
+    if start_index < 0 or start_index >= len(text):
+        return None
+
+    # Find the index of the first numeric digit after the start index
+    first_digit_index = -1
+    for i in range(start_index, len(text)):
+        if text[i].isdigit():
+            first_digit_index = i
+            break
+
+    # If no numeric digit is found, return None
+    if first_digit_index == -1:
+        return None
+
+    # Initialize an empty string to store the consecutive numbers
+    consecutive_numbers = ""
+
+    # Iterate through characters starting from the first numeric digit found
+    for char in text[first_digit_index:]:
+        # Check if the character is a numeric digit
+        if char.isdigit():
+            consecutive_numbers += char
+        else:
+            # Break the loop if a non-numeric character is encountered
+            break
+
+    return consecutive_numbers
+
+
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 st.title("OCR with Streamlit")
@@ -60,9 +94,6 @@ if uploaded_file:
             for page_num in range(num_pages):
                 page = pdf_reader[page_num]
 
-                # # # Convert the page to a Pixmap
-                # pixmap = page.get_pixmap()
-
                 matrix = fitz.Matrix(2, 2)  # You can adjust the scaling factor
                 pixmap = page.get_pixmap(matrix=matrix)
 
@@ -77,6 +108,7 @@ if uploaded_file:
                 # Display the recognized text for each page
                 st.write(f"Page {page_num + 1} OCR Result:")
 
+                # lower casing the text for the proper string matching
                 lower_case_text = text.casefold()
 
                 st.write(lower_case_text)
@@ -109,45 +141,27 @@ if uploaded_file:
                 mass_start = find_regex_with_fuzzy(regexes_for_mass_start, lower_case_text, max_l_dist=2)
                 start_index = mass_start[0].end
 
-                # Find the index of the first numeric digit after the start index
-                first_digit_index = -1
-                for i in range(start_index, len(lower_case_text)):
-                    if lower_case_text[i].isdigit():
-                        first_digit_index = i
-                        break
-
-                # Initialize an empty string to store the consecutive numbers
-                consecutive_numbers = ""
-
-                # Iterate through characters starting from the first numeric digit found
-                for char in lower_case_text[first_digit_index:]:
-                    # Check if the character is a numeric digit
-                    if char.isdigit():
-                        consecutive_numbers += char
-                    else:
-                        # Break the loop if a non-numeric character is encountered
-                        break
-
-                mass = consecutive_numbers
-
-                # search_for_the_second_regex_window = lower_case_text[start_index:start_index + 20]
-                #
-                # mass_end = find_regex_with_fuzzy(regexes_for_mass_end, search_for_the_second_regex_window, max_l_dist=2)
-                #
-                # end_index = mass_end[0].start
-                #
-                # mass = lower_case_text[start_index + 1:end_index:1]
-                # st.write(start_index, end_index)
+                mass = read_consecutive_numbers_from_index(lower_case_text, start_index)
 
                 st.write(f"Dátum: {date}")
                 st.write(f"Szállítólevél: {transfer_number}")
                 st.write(f"Nettó tömeg: {mass}")
 
+                license_plate = license_plate[0].strip()
+                transfer_number = transfer_number.strip()
+
+                # Error handling section
+                if len(transfer_number) != 8:
+                    st.write(f"Hiba a {page_num}. oldalon. (Nem megfelelő szállítólevélszám)")
+
+                if len(license_plate) != 7:
+                    st.write(f"Hiba a {page_num}. oldalon. (Nem megfelelő rendszám)")
+
                 # Append the extracted data to the DataFrame
                 excel_data = excel_data.append({
                     "Dátum": date.strip(),
-                    "Rendszám": license_plate[0].strip(),
-                    "Szállítólevél száma": transfer_number.strip(),
+                    "Rendszám": license_plate,
+                    "Szállítólevél száma": transfer_number,
                     "Súly": mass
                 }, ignore_index=True)
 
