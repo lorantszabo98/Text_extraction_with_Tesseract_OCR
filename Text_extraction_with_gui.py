@@ -1,11 +1,13 @@
 import os
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import ttk
 from fuzzysearch import find_near_matches
 import fitz
 from PIL import Image
 import pytesseract
 import pandas as pd
+
 
 def find_regex_with_fuzzy(reference_list, text, max_l_dist=2):
     match = None
@@ -39,6 +41,7 @@ def extract_data(start_regex, end_regex, text, max_l_dist=2):
     print(start_index, end_index)
 
     return text[start_index + 1:end_index:1]
+
 
 def read_consecutive_numbers_from_index(text, start_index):
     if start_index < 0 or start_index >= len(text):
@@ -121,21 +124,35 @@ def browse_folder(folder_var):
 
 
 def process_folder():
-    folder_path = source_folder_var.get()
-    if folder_path:
+    source_folder = source_folder_var.get()
+    destination_folder = destination_folder_var.get()
+
+    if not source_folder or not destination_folder:
+        tk.messagebox.showerror("Error", "Please select source and destination folders.")
+        return
+
+    if source_folder:
+        progress_bar.grid(row=3, column=0, pady=10)
+        # Initialize progress bar
+        progress_var.set(0)
+        progress_bar['maximum'] = len(os.listdir(source_folder))
+
         excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
-        for file_name in os.listdir(folder_path):
+        for i, file_name in enumerate(os.listdir(source_folder)):
             if file_name.lower().endswith(".pdf"):
-                file_path = os.path.join(folder_path, file_name)
+                file_path = os.path.join(source_folder, file_name)
                 file_data = extract_data_from_pdf(file_path)
                 excel_data = pd.concat([excel_data, file_data], ignore_index=True)
 
+                progress_var.set(i + 1)
+                root.update_idletasks()
+
         # Save the DataFrame to an Excel file
-        destination_folder = destination_folder_var.get()
         excel_file = "output.xlsx"
         destination_folder_path = os.path.join(destination_folder, excel_file)
         excel_data.to_excel(destination_folder_path, index=False)
-        result_label.config(text=f"Extraction completed. Data saved to {excel_file}")
+
+        tk.messagebox.showinfo("Kész", f"Az excel mentve lett a {destination_folder_path} helyre")
 
 # initialization of the OCR engine
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -152,21 +169,24 @@ source_folder_label = tk.Label(root, text="Kérem válassza ki a forrásmappát 
 source_folder_entry = tk.Entry(root, textvariable=source_folder_var, state="readonly", width=50)
 source_folder_button = tk.Button(root, text="Kiválasztás", command=lambda: browse_folder(source_folder_var))
 
-destination_folder_label = tk.Label(root, text="Kérem válassza ki a célmappát(ahova szeretné menteni az excelt):")
+destination_folder_label = tk.Label(root, text="Kérem válassza ki a célmappát (ahova szeretné menteni az excelt):")
 destination_folder_entry = tk.Entry(root, textvariable=destination_folder_var, state="readonly", width=50)
-destination_folder_button = tk.Button(root, text="Kivlasztás", command=lambda: browse_folder(destination_folder_var))
+destination_folder_button = tk.Button(root, text="Kiválasztás", command=lambda: browse_folder(destination_folder_var))
 
 extract_button = tk.Button(root, text="Futtatás", command=process_folder)
 
 # A felső rész elrendezése
-source_folder_label.grid(row=0, column=0)
+source_folder_label.grid(row=0, column=0, sticky="w")
 source_folder_entry.grid(row=0, column=1)
 source_folder_button.grid(row=0, column=2)
-destination_folder_label.grid(row=1, column=0)
+destination_folder_label.grid(row=1, column=0, sticky="w")
 destination_folder_entry.grid(row=1, column=1)
 destination_folder_button.grid(row=1, column=2)
 extract_button.grid(row=2, column=0)
 
+# Progress bar
+progress_var = tk.IntVar()
+progress_bar = ttk.Progressbar(root, variable=progress_var, mode='determinate')
 
 # # Az alsó rész létrehozása
 # error_list = tk.Listbox(root)
