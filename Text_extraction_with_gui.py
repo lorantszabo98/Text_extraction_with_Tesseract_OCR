@@ -62,6 +62,10 @@ def read_consecutive_numbers_from_index(text, start_index):
     return consecutive_numbers
 
 
+def regex_not_found_message(column):
+    return f"A {column} nem meghatározható"
+
+
 def extract_data_from_pdf(pdf_path):
     excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
     with fitz.open(pdf_path, filetype="pdf") as pdf_reader:
@@ -75,42 +79,60 @@ def extract_data_from_pdf(pdf_path):
             text = pytesseract.image_to_string(image, lang="hun")
             lower_case_text = text.casefold()
 
+            errors = []
+
             regexes_for_date_start = ['teljesítés kelte:']
             regexes_for_date_end = ['szállítólevélszám']
             date = extract_data(regexes_for_date_start, regexes_for_date_end, lower_case_text, max_l_dist=2)
+
+            if date is None:
+                errors.append(regex_not_found_message("Dátum"))
 
             regexes_for_transfer_number_start = ['szállítólevélszám:']
             regexes_for_transfer_number_end = ['jármű']
             transfer_number = extract_data(regexes_for_transfer_number_start, regexes_for_transfer_number_end, lower_case_text, max_l_dist=1)
 
+            if transfer_number is None:
+                errors.append(regex_not_found_message("Szállítólevélszám"))
+
+            else:
+                transfer_number = transfer_number.strip()
+                if len(transfer_number) != 8:
+                    errors.append("Nem megfelelő szállítólevélszám")
+
             regexes_for_license_plate_start = ['jármű:']
             regexes_for_license_plate_end = ['mérlegelt bruttó']
             license_plate = extract_data(regexes_for_license_plate_start, regexes_for_license_plate_end, lower_case_text, max_l_dist=1)
 
-            regexes_for_mass_start = ['nettó tömeg:']
-            mass_start = find_regex_with_fuzzy(regexes_for_mass_start, lower_case_text, max_l_dist=2)
-            start_index = mass_start[0].end
-            mass = read_consecutive_numbers_from_index(lower_case_text, start_index)
-
-            if license_plate is not None:
+            if license_plate is None:
+                errors.append(regex_not_found_message("Rendszám"))
+            else:
                 license_plate = license_plate.upper()
                 license_plate = license_plate.split(',')
 
-            license_plate = license_plate[0].strip()
-            transfer_number = transfer_number.strip()
+                license_plate = license_plate[0].strip()
+                if len(license_plate) != 7:
+                    errors.append("Nem megfelelő rendszám")
 
-            # Error handling section
-            errors = []
-            if len(transfer_number) != 8:
-                errors.append("Nem megfelelő szállítólevélszám")
-            if len(license_plate) != 7:
-                errors.append("Nem megfelelő rendszám")
+            regexes_for_mass_start = ['nettó tömeg:']
+            mass_start = find_regex_with_fuzzy(regexes_for_mass_start, lower_case_text, max_l_dist=2)
+
+            if mass_start is None:
+                errors.append(regex_not_found_message("Súly"))
+                mass = None
+            else:
+                start_index = mass_start[0].end
+                mass = read_consecutive_numbers_from_index(lower_case_text, start_index)
+
+            # if there is an error, we add the page number to the file for easier inspection
+            if len(errors) > 0:
+                errors.insert(0, f"Az oldal száma: {page_num + 1}")
 
             # Append the extracted data and errors to the DataFrame
             excel_data = excel_data.append({
                 "Dátum": date.strip() if date else "",
-                "Rendszám": license_plate,
-                "Szállítólevél száma": transfer_number,
+                "Rendszám": license_plate if license_plate else "",
+                "Szállítólevél száma": transfer_number if transfer_number else "",
                 "Súly": mass.strip() if mass else "",
                 "Hiba": ", ".join(errors) if errors else ""
             }, ignore_index=True)
@@ -170,9 +192,15 @@ def process_folder():
     # Save the DataFrame to an Excel file
     excel_file = "output.xlsx"
     destination_folder_path = os.path.join(destination_folder, excel_file)
-    excel_data.to_excel(destination_folder_path, index=False)
+    try:
+        excel_data.to_excel(destination_folder_path, index=False)
 
-    tk.messagebox.showinfo("Kész", f"Az excel mentve lett a {destination_folder_path} helyre")
+        tk.messagebox.showinfo("Kész", f"Az excel mentve lett a {destination_folder_path} helyre")
+
+    except PermissionError:
+        tk.messagebox.showerror('Hiba', 'Az Ecel fájl meg van nyitva! \nZárja be az Excelt és futtassa újra a programot!')
+    except Exception as e:
+        tk.messagebox.showerror("Hiba", f"Hiba történt a fájl mentése közben: {e}")
 
     # Close the progress window
     # progress_window.destroy()
