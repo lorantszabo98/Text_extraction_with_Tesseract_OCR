@@ -128,31 +128,70 @@ def process_folder():
     destination_folder = destination_folder_var.get()
 
     if not source_folder or not destination_folder:
-        tk.messagebox.showerror("Error", "Please select source and destination folders.")
+        tk.messagebox.showerror("Hiba", "Kérem válasszon forrás és célmappát!")
         return
 
-    if source_folder:
-        progress_bar.grid(row=3, column=0, pady=10)
-        # Initialize progress bar
-        progress_var.set(0)
-        progress_bar['maximum'] = len(os.listdir(source_folder))
+    # # Create a new window for processing
+    # progress_window = tk.Toplevel(root)
+    # progress_window.title("Feldolgozás")
+    #
+    # # Add a label for processing message
+    # processing_label = tk.Label(progress_window, text="Feldolgozás folyamatban...", padx=10, pady=10)
+    # processing_label.pack()
+    #
+    # # Add a progress bar
+    # progress_bar = ttk.Progressbar(progress_window, mode='indeterminate')
+    # progress_bar.pack()
+    #
+    # # Start the progress bar
+    # progress_bar.start()
+    #
+    # # Do the processing in a separate thread or as a background task
+    # root.update_idletasks()
 
-        excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
-        for i, file_name in enumerate(os.listdir(source_folder)):
-            if file_name.lower().endswith(".pdf"):
-                file_path = os.path.join(source_folder, file_name)
-                file_data = extract_data_from_pdf(file_path)
-                excel_data = pd.concat([excel_data, file_data], ignore_index=True)
+    progress_bar.grid(row=4, column=0, pady=10)
+    # Initialize progress bar
+    progress_var.set(0)
+    progress_bar['maximum'] = len(os.listdir(source_folder))
 
-                progress_var.set(i + 1)
-                root.update_idletasks()
+    excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
+    for i, file_name in enumerate(os.listdir(source_folder)):
+        if file_name.lower().endswith(".pdf"):
+            file_path = os.path.join(source_folder, file_name)
+            file_data = extract_data_from_pdf(file_path)
+            excel_data = pd.concat([excel_data, file_data], ignore_index=True)
 
-        # Save the DataFrame to an Excel file
-        excel_file = "output.xlsx"
-        destination_folder_path = os.path.join(destination_folder, excel_file)
-        excel_data.to_excel(destination_folder_path, index=False)
+            progress_var.set(i + 1)
+            root.update_idletasks()
 
-        tk.messagebox.showinfo("Kész", f"Az excel mentve lett a {destination_folder_path} helyre")
+    # Stop the progress bar
+    # progress_bar.stop()
+
+    # Save the DataFrame to an Excel file
+    excel_file = "output.xlsx"
+    destination_folder_path = os.path.join(destination_folder, excel_file)
+    excel_data.to_excel(destination_folder_path, index=False)
+
+    tk.messagebox.showinfo("Kész", f"Az excel mentve lett a {destination_folder_path} helyre")
+
+    # Close the progress window
+    # progress_window.destroy()
+
+
+def show_info():
+    info_text = "- A forrásmappa kiválasztásához kattintson az első 'Kiválasztás' gombra, majd itt keresse meg azt a mappát " \
+                ",amely a PDF-eket tartalmazza, kattintson a mappára egyszer, majd lent a 'Mappaválasztás gombra'.\n\n" \
+                "- Ugyanezt végezze el a célmappa esetén is, de itt azt a mappát válassza ki, ahova menteni szeretné " \
+                "az Excel fájlt.\n\n" \
+                "- Ha mindez megvan, akkor kattinthat a 'Futtatás' gombra ezzel végrehajtva a szöveg kinyerését a PDF-ekből.\n\n" \
+                "- Ez több percig is eltarthat a PDF-ek számának fügvényében, kérem addig ne zárja be a programot.\n\n" \
+                "- A folyamat befejezését a program jelzi, majd a létrehozott Excel fájlt megtalálja a célmappába mentve 'output.xlsx' " \
+                "néven.\n\n"
+    info_window = tk.Toplevel(root)
+    info_window.title("Információ")
+
+    info_label = tk.Label(info_window, text=info_text, padx=10, pady=10, wraplength=600, justify="left")
+    info_label.pack()
 
 # initialization of the OCR engine
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -176,29 +215,22 @@ destination_folder_button = tk.Button(root, text="Kiválasztás", command=lambda
 extract_button = tk.Button(root, text="Futtatás", command=process_folder)
 
 # A felső rész elrendezése
-source_folder_label.grid(row=0, column=0, sticky="w")
-source_folder_entry.grid(row=0, column=1)
-source_folder_button.grid(row=0, column=2)
-destination_folder_label.grid(row=1, column=0, sticky="w")
-destination_folder_entry.grid(row=1, column=1)
-destination_folder_button.grid(row=1, column=2)
-extract_button.grid(row=2, column=0)
+source_folder_label.grid(row=1, column=0, sticky="w")
+source_folder_entry.grid(row=1, column=1)
+source_folder_button.grid(row=1, column=2)
+destination_folder_label.grid(row=2, column=0, sticky="w")
+destination_folder_entry.grid(row=2, column=1)
+destination_folder_button.grid(row=2, column=2)
+extract_button.grid(row=3, column=0)
 
 # Progress bar
 progress_var = tk.IntVar()
 progress_bar = ttk.Progressbar(root, variable=progress_var, mode='determinate')
 
-# # Az alsó rész létrehozása
-# error_list = tk.Listbox(root)
-#
-# # Az alsó rész elrendezése
-# error_list.grid(row=3, column=0, rowspan=3)
-
-# Extraction button
-
-# Result label
-result_label = tk.Label(root, text="")
-
+# Info Icon
+info_icon = ttk.Label(root, text="ℹ", font=("Arial", 14), cursor="hand2")
+info_icon.grid(row=0, column=2, padx=5)
+info_icon.bind("<Button-1>", lambda event: show_info())
 
 # Get the screen size and set the window size to half of it
 screen_width = root.winfo_screenwidth()
