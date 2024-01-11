@@ -7,6 +7,8 @@ import fitz
 from PIL import Image
 import pytesseract
 import pandas as pd
+from queue import Queue
+import threading
 
 
 def find_regex_with_fuzzy(reference_list, text, max_l_dist=2):
@@ -145,49 +147,18 @@ def browse_folder(folder_var):
     folder_var.set(folder_selected)
 
 
-def process_folder():
-    source_folder = source_folder_var.get()
-    destination_folder = destination_folder_var.get()
-
-    if not source_folder or not destination_folder:
-        tk.messagebox.showerror("Hiba", "Kérem válasszon forrás és célmappát!")
-        return
-
-    # # Create a new window for processing
-    # progress_window = tk.Toplevel(root)
-    # progress_window.title("Feldolgozás")
-    #
-    # # Add a label for processing message
-    # processing_label = tk.Label(progress_window, text="Feldolgozás folyamatban...", padx=10, pady=10)
-    # processing_label.pack()
-    #
-    # # Add a progress bar
-    # progress_bar = ttk.Progressbar(progress_window, mode='indeterminate')
-    # progress_bar.pack()
-    #
-    # # Start the progress bar
-    # progress_bar.start()
-    #
-    # # Do the processing in a separate thread or as a background task
-    # root.update_idletasks()
-
-    progress_bar.grid(row=4, column=0, pady=10)
-    # Initialize progress bar
-    progress_var.set(0)
-    progress_bar['maximum'] = len(os.listdir(source_folder))
+def process_folder(source_folder, destination_folder, progress_queue):
 
     excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
-    for i, file_name in enumerate(os.listdir(source_folder)):
-        if file_name.lower().endswith(".pdf"):
-            file_path = os.path.join(source_folder, file_name)
-            file_data = extract_data_from_pdf(file_path)
-            excel_data = pd.concat([excel_data, file_data], ignore_index=True)
+    file_list = [file_name for file_name in os.listdir(source_folder) if file_name.lower().endswith(".pdf")]
+    total_files = len(file_list)
 
-            progress_var.set(i + 1)
-            root.update_idletasks()
+    for i, file_name in enumerate(file_list):
+        file_path = os.path.join(source_folder, file_name)
+        file_data = extract_data_from_pdf(file_path)
+        excel_data = pd.concat([excel_data, file_data], ignore_index=True)
 
-    # Stop the progress bar
-    # progress_bar.stop()
+        progress_queue.put((i + 1) * 100 // total_files)
 
     # Save the DataFrame to an Excel file
     excel_file = "output.xlsx"
@@ -202,8 +173,44 @@ def process_folder():
     except Exception as e:
         tk.messagebox.showerror("Hiba", f"Hiba történt a fájl mentése közben: {e}")
 
-    # Close the progress window
-    # progress_window.destroy()
+    progress_queue.put(100)
+
+
+def update_progress_bar(progress_var, progress_queue, root):
+    progress_text.grid(row=4, column=0, pady=5)
+    progress_bar.grid(row=5, column=0, pady=5)
+
+    def update():
+        while not progress_queue.empty():
+            progress_value = progress_queue.get()
+            progress_var.set(progress_value)
+            root.update_idletasks()
+
+            if progress_value == 100:
+                progress_text.grid_forget()
+                progress_bar.grid_forget()
+        root.after(1, update)  # Schedule the update after a short delay
+
+    # Start the update loop
+    update()
+
+
+def start_processing():
+    source_folder = source_folder_var.get()
+    destination_folder = destination_folder_var.get()
+
+    if not source_folder or not destination_folder:
+        tk.messagebox.showerror("Hiba", "Kérem válasszon forrás és célmappát!")
+        return
+
+    # Start a new thread for processing
+    progress_queue = Queue()
+    process_thread = threading.Thread(target=process_folder, args=(source_folder, destination_folder, progress_queue), daemon=True)
+    process_thread.start()
+
+    # Start a new thread for updating progress
+    update_thread = threading.Thread(target=update_progress_bar, args=(progress_var, progress_queue, root), daemon=True)
+    update_thread.start()
 
 
 def show_info():
@@ -240,7 +247,7 @@ destination_folder_label = tk.Label(root, text="Kérem válassza ki a célmappá
 destination_folder_entry = tk.Entry(root, textvariable=destination_folder_var, state="readonly", width=50)
 destination_folder_button = tk.Button(root, text="Kiválasztás", command=lambda: browse_folder(destination_folder_var))
 
-extract_button = tk.Button(root, text="Futtatás", command=process_folder)
+extract_button = tk.Button(root, text="Futtatás", command=start_processing)
 
 # A felső rész elrendezése
 source_folder_label.grid(row=1, column=0, sticky="w")
@@ -251,9 +258,12 @@ destination_folder_entry.grid(row=2, column=1)
 destination_folder_button.grid(row=2, column=2)
 extract_button.grid(row=3, column=0)
 
+progress_text = tk.Label(root, text="Futtatás..., ez több percig is eltarthat")
+
 # Progress bar
 progress_var = tk.IntVar()
 progress_bar = ttk.Progressbar(root, variable=progress_var, mode='determinate')
+
 
 # Info Icon
 info_icon = ttk.Label(root, text="ℹ", font=("Arial", 14), cursor="hand2")
@@ -263,8 +273,8 @@ info_icon.bind("<Button-1>", lambda event: show_info())
 # Get the screen size and set the window size to half of it
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
-window_width = screen_width // 2 - 50
-window_height = screen_height // 2 - 50
+window_width = screen_width // 2 - 40
+window_height = screen_height // 2 - 40
 
 # Set the window geometry
 root.geometry(f"{window_width}x{window_height}+{50}+{50}")
