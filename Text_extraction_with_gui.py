@@ -68,7 +68,7 @@ def regex_not_found_message(column):
     return f"A {column} nem meghatározható"
 
 
-def extract_data_from_pdf(pdf_path):
+def extract_data_from_pdf(pdf_path, selected_mode_, filname):
     excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
     with fitz.open(pdf_path, filetype="pdf") as pdf_reader:
         num_pages = pdf_reader.page_count
@@ -126,9 +126,11 @@ def extract_data_from_pdf(pdf_path):
                 start_index = mass_start[0].end
                 mass = read_consecutive_numbers_from_index(lower_case_text, start_index)
 
-            # if there is an error, we add the page number to the file for easier inspection
+            # if there is an error, we add the file name and the page num (if there is multiple pages) for easier inspection
             if len(errors) > 0:
-                errors.insert(0, f"Az oldal száma: {page_num + 1}")
+                errors.insert(0, f"A fájl neve: {filname}")
+                if num_pages > 1:
+                    errors.insert(1, f"Az oldal száma: {page_num + 1}")
 
             # Append the extracted data and errors to the DataFrame
             excel_data = excel_data.append({
@@ -148,16 +150,14 @@ def browse_folder(folder_var):
 
 
 def process_folder(source_folder, destination_folder, progress_queue):
-
     excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
     file_list = [file_name for file_name in os.listdir(source_folder) if file_name.lower().endswith(".pdf")]
     total_files = len(file_list)
 
     for i, file_name in enumerate(file_list):
         file_path = os.path.join(source_folder, file_name)
-        file_data = extract_data_from_pdf(file_path)
+        file_data = extract_data_from_pdf(file_path, selected_mode.get(), file_name)
         excel_data = pd.concat([excel_data, file_data], ignore_index=True)
-
         progress_queue.put((i + 1) * 100 // total_files)
 
     # Save the DataFrame to an Excel file
@@ -238,6 +238,7 @@ root.title("Szállítólevél olvasó")
 # Folder selection
 source_folder_var = tk.StringVar()
 destination_folder_var = tk.StringVar()
+selected_mode = tk.StringVar()
 
 source_folder_label = tk.Label(root, text="Kérem válassza ki a forrásmappát (ahol a PDF-ek vannak):")
 source_folder_entry = tk.Entry(root, textvariable=source_folder_var, state="readonly", width=50)
@@ -246,6 +247,9 @@ source_folder_button = tk.Button(root, text="Kiválasztás", command=lambda: bro
 destination_folder_label = tk.Label(root, text="Kérem válassza ki a célmappát (ahova szeretné menteni az excelt):")
 destination_folder_entry = tk.Entry(root, textvariable=destination_folder_var, state="readonly", width=50)
 destination_folder_button = tk.Button(root, text="Kiválasztás", command=lambda: browse_folder(destination_folder_var))
+
+# mode_select_label = ttk.Label(root, text="Válassza ki a PDF-ek típusát:")
+# mode_select_option_menu = ttk.OptionMenu(root, selected_mode, *["Egy PDF sok oldallal", "Egy PDF sok oldallal", "Több PDF egy oldallal"])
 
 extract_button = tk.Button(root, text="Futtatás", command=start_processing)
 
@@ -256,6 +260,8 @@ source_folder_button.grid(row=1, column=2)
 destination_folder_label.grid(row=2, column=0, sticky="w")
 destination_folder_entry.grid(row=2, column=1)
 destination_folder_button.grid(row=2, column=2)
+# mode_select_label.grid(row=3, column=0, sticky="w")
+# mode_select_option_menu.grid(row=3, column=1)
 extract_button.grid(row=3, column=0)
 
 progress_text = tk.Label(root, text="Futtatás..., ez több percig is eltarthat")
