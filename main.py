@@ -4,8 +4,8 @@ import streamlit as st
 import fitz
 
 
-# Path to the Tesseract OCR executable (change if necessary)
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Path to the Tesseract OCR executable (add yours)
+pytesseract.pytesseract.tesseract_cmd = r''
 
 st.title("OCR with Streamlit")
 
