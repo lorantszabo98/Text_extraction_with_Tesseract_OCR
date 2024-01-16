@@ -11,6 +11,7 @@ from queue import Queue
 import threading
 
 
+# using the fuzzysearch library to find regexes in a text
 def find_regex_with_fuzzy(reference_list, text, max_l_dist=2):
     match = None
     for reference in reference_list:
@@ -22,13 +23,14 @@ def find_regex_with_fuzzy(reference_list, text, max_l_dist=2):
     return match
 
 
+# return the string matching based in the fuzzy search
 def extract_data(start_regex, end_regex, text, max_l_dist=2):
 
     start_word = find_regex_with_fuzzy(start_regex, text, max_l_dist)
 
     if start_word is None:
         print("Start regex not found.")
-        return None  # or return some default value or handle the case
+        return None
 
     start_index = start_word[0].end
 
@@ -36,15 +38,16 @@ def extract_data(start_regex, end_regex, text, max_l_dist=2):
 
     if end_word is None:
         print("End regex not found.")
-        return None  # or return some default value or handle the case
+        return None  #
 
     end_index = end_word[0].start
 
-    print(start_index, end_index)
+    # print(start_index, end_index)
 
     return text[start_index + 1:end_index:1]
 
 
+# read the consecutive_numbers for the mass
 def read_consecutive_numbers_from_index(text, start_index):
     if start_index < 0 or start_index >= len(text):
         return None
@@ -64,10 +67,12 @@ def read_consecutive_numbers_from_index(text, start_index):
     return consecutive_numbers
 
 
+# error message
 def regex_not_found_message(column):
     return f"A {column} nem meghatározható"
 
 
+# function for the specified task, which reads the pdf, converts to image and perform OCR on it
 def extract_data_from_pdf(pdf_path, selected_mode_, filname):
     excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
     with fitz.open(pdf_path, filetype="pdf") as pdf_reader:
@@ -83,7 +88,8 @@ def extract_data_from_pdf(pdf_path, selected_mode_, filname):
 
             errors = []
 
-            regexes_for_date_start = ['teljesítés kelte:']
+            date_regex = 'teljesítés kelte:'
+            regexes_for_date_start = [date_regex]
             regexes_for_date_end = ['szállítólevélszám']
             date = extract_data(regexes_for_date_start, regexes_for_date_end, lower_case_text, max_l_dist=2)
 
@@ -144,11 +150,14 @@ def extract_data_from_pdf(pdf_path, selected_mode_, filname):
     return excel_data
 
 
+# for the source and the target folder selection
 def browse_folder(folder_var):
     folder_selected = filedialog.askdirectory()
     folder_var.set(folder_selected)
 
 
+# function which reads every pdf in a folder and perform the extract_data_from_pdf on themm and write the results to an
+# Excel file
 def process_folder(source_folder, destination_folder, progress_queue):
     excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
     file_list = [file_name for file_name in os.listdir(source_folder) if file_name.lower().endswith(".pdf")]
@@ -176,6 +185,7 @@ def process_folder(source_folder, destination_folder, progress_queue):
     progress_queue.put(100)
 
 
+# function for the threaded continuous progress bar updating
 def update_progress_bar(progress_var, progress_queue, root):
     progress_text.grid(row=4, column=0, pady=5)
     progress_bar.grid(row=5, column=0, pady=5)
@@ -195,6 +205,7 @@ def update_progress_bar(progress_var, progress_queue, root):
     update()
 
 
+# function for the multi-threaded GUI
 def start_processing():
     source_folder = source_folder_var.get()
     destination_folder = destination_folder_var.get()
@@ -213,6 +224,7 @@ def start_processing():
     update_thread.start()
 
 
+# show info on the GUI
 def show_info():
     info_text = "- A forrásmappa kiválasztásához kattintson az első 'Kiválasztás' gombra, majd itt keresse meg azt a mappát " \
                 ",amely a PDF-eket tartalmazza, kattintson a mappára egyszer, majd lent a 'Mappaválasztás gombra'.\n\n" \
@@ -231,7 +243,7 @@ def show_info():
 # initialization of the OCR engine
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-# Create the main windowv with Tkinter
+# Create the main window with Tkinter
 root = tk.Tk()
 root.title("Szállítólevél olvasó")
 
@@ -240,6 +252,7 @@ source_folder_var = tk.StringVar()
 destination_folder_var = tk.StringVar()
 selected_mode = tk.StringVar()
 
+# initialization of the widgets
 source_folder_label = tk.Label(root, text="Kérem válassza ki a forrásmappát (ahol a PDF-ek vannak):")
 source_folder_entry = tk.Entry(root, textvariable=source_folder_var, state="readonly", width=50)
 source_folder_button = tk.Button(root, text="Kiválasztás", command=lambda: browse_folder(source_folder_var))
@@ -253,7 +266,7 @@ destination_folder_button = tk.Button(root, text="Kiválasztás", command=lambda
 
 extract_button = tk.Button(root, text="Futtatás", command=start_processing)
 
-# A felső rész elrendezése
+# using grid to place the widgets
 source_folder_label.grid(row=1, column=0, sticky="w")
 source_folder_entry.grid(row=1, column=1)
 source_folder_button.grid(row=1, column=2)
@@ -264,7 +277,7 @@ destination_folder_button.grid(row=2, column=2)
 # mode_select_option_menu.grid(row=3, column=1)
 extract_button.grid(row=3, column=0)
 
-progress_text = tk.Label(root, text="Futtatás..., ez több percig is eltarthat")
+progress_text = tk.Label(root, text="Futtatás... (ez eltarthat egy ideig)")
 
 # Progress bar
 progress_var = tk.IntVar()
