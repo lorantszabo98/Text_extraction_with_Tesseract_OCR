@@ -74,7 +74,8 @@ def regex_not_found_message(column):
 
 # function for the specified task, which reads the pdf, converts to image and perform OCR on it
 def extract_data_from_pdf(pdf_path, selected_mode_, filname):
-    excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
+    # USE YOUR OWN COLUMN NAMES
+    excel_data = pd.DataFrame(columns=["", "", "", "", "Hiba"])
     with fitz.open(pdf_path, filetype="pdf") as pdf_reader:
         num_pages = pdf_reader.page_count
         for page_num in range(num_pages):
@@ -83,21 +84,26 @@ def extract_data_from_pdf(pdf_path, selected_mode_, filname):
             pixmap = page.get_pixmap(matrix=matrix)
             image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
 
+            # CHANGE THE LANGUAGE IF YOU NEED
             text = pytesseract.image_to_string(image, lang="hun")
             lower_case_text = text.casefold()
 
             errors = []
 
-            date_regex = 'teljesítés kelte:'
+            # USE YOUR OWN REGEX
+            date_regex = ''
             regexes_for_date_start = [date_regex]
-            regexes_for_date_end = ['szállítólevélszám']
+            # USE YOUR OWN REGEX
+            regexes_for_date_end = ['']
             date = extract_data(regexes_for_date_start, regexes_for_date_end, lower_case_text, max_l_dist=2)
 
             if date is None:
                 errors.append(regex_not_found_message("Dátum"))
 
-            regexes_for_transfer_number_start = ['szállítólevélszám:']
-            regexes_for_transfer_number_end = ['jármű']
+            # USE YOUR OWN REGEX
+            regexes_for_transfer_number_start = ['']
+            # USE YOUR OWN REGEX
+            regexes_for_transfer_number_end = ['']
             transfer_number = extract_data(regexes_for_transfer_number_start, regexes_for_transfer_number_end, lower_case_text, max_l_dist=1)
 
             if transfer_number is None:
@@ -108,8 +114,10 @@ def extract_data_from_pdf(pdf_path, selected_mode_, filname):
                 if len(transfer_number) != 8:
                     errors.append("Nem megfelelő szállítólevélszám")
 
-            regexes_for_license_plate_start = ['jármű:']
-            regexes_for_license_plate_end = ['mérlegelt bruttó']
+            # USE YOUR OWN REGEX
+            regexes_for_license_plate_start = ['']
+            # USE YOUR OWN REGEX
+            regexes_for_license_plate_end = ['']
             license_plate = extract_data(regexes_for_license_plate_start, regexes_for_license_plate_end, lower_case_text, max_l_dist=1)
 
             if license_plate is None:
@@ -122,7 +130,8 @@ def extract_data_from_pdf(pdf_path, selected_mode_, filname):
                 if len(license_plate) != 7:
                     errors.append("Nem megfelelő rendszám")
 
-            regexes_for_mass_start = ['nettó tömeg:']
+            # USE YOUR OWN REGEX
+            regexes_for_mass_start = ['']
             mass_start = find_regex_with_fuzzy(regexes_for_mass_start, lower_case_text, max_l_dist=2)
 
             if mass_start is None:
@@ -138,6 +147,7 @@ def extract_data_from_pdf(pdf_path, selected_mode_, filname):
                 if num_pages > 1:
                     errors.insert(1, f"Az oldal száma: {page_num + 1}")
 
+            # CHANGE IT FOR YOUR PURPOSE            
             # Append the extracted data and errors to the DataFrame
             excel_data = excel_data.append({
                 "Dátum": date.strip() if date else "",
@@ -156,10 +166,11 @@ def browse_folder(folder_var):
     folder_var.set(folder_selected)
 
 
-# function which reads every pdf in a folder and perform the extract_data_from_pdf on themm and write the results to an
+# function which reads every pdf in a folder and perform the extract_data_from_pdf on them and write the results to an
 # Excel file
 def process_folder(source_folder, destination_folder, progress_queue):
-    excel_data = pd.DataFrame(columns=["Dátum", "Rendszám", "Szállítólevél száma", "Súly", "Hiba"])
+    # USE YOUR OWN COLUMN NAMES
+    excel_data = pd.DataFrame(columns=["", "", "", "", "Hiba"])
     file_list = [file_name for file_name in os.listdir(source_folder) if file_name.lower().endswith(".pdf")]
     total_files = len(file_list)
 
@@ -241,7 +252,8 @@ def show_info():
     info_label.pack()
 
 # initialization of the OCR engine
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# USE YOUR OWN PATH TO THE TESSERACT.EXE
+pytesseract.pytesseract.tesseract_cmd = r''
 
 # Create the main window with Tkinter
 root = tk.Tk()
